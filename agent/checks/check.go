@@ -544,19 +544,44 @@ func shutdownHTTP2ClientConn(clientConn *http2.ClientConn, timeout time.Duration
 	}
 }
 
+func sourceIpAddressHc() *net.TCPAddr {
+	ip := net.ParseIP(os.Getenv("AGENT_HEALTH_CHECKS_SOURCE_IP"))
+	if ip == nil {
+		return nil
+	}
+
+	return &net.TCPAddr{
+		IP:   ip,
+		Port: 0,
+	}
+}
+
 func (c *CheckH2PING) check() {
 	t := &http2.Transport{}
 	var dialFunc func(ctx context.Context, network, address string, tlscfg *tls.Config) (net.Conn, error)
 	if c.TLSClientConfig != nil {
 		t.TLSClientConfig = c.TLSClientConfig
 		dialFunc = func(ctx context.Context, network, address string, tlscfg *tls.Config) (net.Conn, error) {
-			dialer := &tls.Dialer{Config: tlscfg}
+			tcpDialer := &net.Dialer{}
+			sourceIP := sourceIpAddressHc()
+			if sourceIP != nil {
+				tcpDialer.LocalAddr = sourceIP
+			}
+
+			dialer := &tls.Dialer{Config: tlscfg, NetDialer: tcpDialer}
+
 			return dialer.DialContext(ctx, network, address)
 		}
 	} else {
 		t.AllowHTTP = true
 		dialFunc = func(ctx context.Context, network, address string, tlscfg *tls.Config) (net.Conn, error) {
 			dialer := &net.Dialer{}
+
+			sourceIP := sourceIpAddressHc()
+			if sourceIP != nil {
+				dialer.LocalAddr = sourceIP
+			}
+
 			return dialer.DialContext(ctx, network, address)
 		}
 	}
@@ -660,6 +685,11 @@ func (c *CheckTCP) Start() {
 		if c.Timeout > 0 {
 			c.dialer.Timeout = c.Timeout
 		}
+
+		sourceIP := sourceIpAddressHc()
+		if sourceIP != nil {
+			c.dialer.LocalAddr = sourceIP
+		}
 	}
 
 	c.stop = false
@@ -753,6 +783,10 @@ func (c *CheckUDP) Start() {
 		}
 		if c.Timeout > 0 {
 			c.dialer.Timeout = c.Timeout
+		}
+		sourceIP := sourceIpAddressHc()
+		if sourceIP != nil {
+			c.dialer.LocalAddr = sourceIP
 		}
 	}
 

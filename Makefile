@@ -170,10 +170,7 @@ dev: dev-build ## Dev creates binaries for testing locally - these are put into 
 .PHONY: dev-build
 dev-build: ## Same as dev
 	mkdir -p bin
-	CGO_ENABLED=0 go install -ldflags "$(GOLDFLAGS)" -tags "$(GOTAGS)"
-	# rm needed due to signature caching (https://apple.stackexchange.com/a/428388)
-	rm -f ./bin/consul
-	cp ${MAIN_GOPATH}/bin/consul ./bin/consul
+	CGO_ENABLED=0 go build -ldflags "$(GOLDFLAGS)" -tags "$(GOTAGS)" -o ./bin/consul
 
 .PHONY: dev-docker-dbg
 dev-docker-dbg: dev-docker ## Build containers for debug mode
